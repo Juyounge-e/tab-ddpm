@@ -423,13 +423,12 @@ class ResNet(nn.Module):
 #### For diffusion 
 
 class MLPDiffusion(nn.Module):
-    def __init__(self, d_in, num_classes, is_y_cond, rtdl_params, dim_t = 128):
+    def __init__(self, d_in, num_classes, is_y_cond, rtdl_params, dim_t=128, d_y_cond=1):
         super().__init__()
         self.dim_t = dim_t
         self.num_classes = num_classes
         self.is_y_cond = is_y_cond
-
-        # d0 = rtdl_params['d_layers'][0]
+        self.d_y_cond = d_y_cond
 
         rtdl_params['d_in'] = dim_t
         rtdl_params['d_out'] = d_in
@@ -439,7 +438,7 @@ class MLPDiffusion(nn.Module):
         if self.num_classes > 0 and is_y_cond:
             self.label_emb = nn.Embedding(self.num_classes, dim_t)
         elif self.num_classes == 0 and is_y_cond:
-            self.label_emb = nn.Linear(1, dim_t)
+            self.label_emb = nn.Linear(d_y_cond, dim_t)
         
         self.proj = nn.Linear(d_in, dim_t)
         self.time_embed = nn.Sequential(
@@ -454,7 +453,14 @@ class MLPDiffusion(nn.Module):
             if self.num_classes > 0:
                 y = y.squeeze()
             else:
-                y = y.resize(y.size(0), 1).float()
+                y = y.float()
+                if y.dim() == 1:
+                    y = y.unsqueeze(1)
+                if y.size(1) != self.d_y_cond:
+                    y = y[:, : self.d_y_cond]
+                    if y.size(1) < self.d_y_cond:
+                        pad = y.new_zeros(y.size(0), self.d_y_cond - y.size(1))
+                        y = torch.cat([y, pad], dim=1)
             emb += F.silu(self.label_emb(y))
         x = self.proj(x) + emb
         return self.mlp(x)
