@@ -429,6 +429,11 @@ class MLPDiffusion(nn.Module):
         self.num_classes = num_classes
         self.is_y_cond = is_y_cond
         self.d_y_cond = d_y_cond
+<<<<<<< HEAD
+=======
+
+        # d0 = rtdl_params['d_layers'][0]
+>>>>>>> ba8f84d (condition dimension updates)
 
         rtdl_params['d_in'] = dim_t
         rtdl_params['d_out'] = d_in
@@ -438,7 +443,15 @@ class MLPDiffusion(nn.Module):
         if self.num_classes > 0 and is_y_cond:
             self.label_emb = nn.Embedding(self.num_classes, dim_t)
         elif self.num_classes == 0 and is_y_cond:
+<<<<<<< HEAD
             self.label_emb = nn.Linear(d_y_cond, dim_t)
+=======
+            if d_y_cond >= 2:
+                # 연속 조건을 개별 임베딩 후 합산 (예: pdr_mean, N)
+                self.cond_embs = nn.ModuleList([nn.Linear(1, dim_t) for _ in range(d_y_cond)])
+            else:
+                self.label_emb = nn.Linear(d_y_cond, dim_t)
+>>>>>>> ba8f84d (condition dimension updates)
         
         self.proj = nn.Linear(d_in, dim_t)
         self.time_embed = nn.Sequential(
@@ -452,6 +465,7 @@ class MLPDiffusion(nn.Module):
         if self.is_y_cond and y is not None:
             if self.num_classes > 0:
                 y = y.squeeze()
+                emb += F.silu(self.label_emb(y))
             else:
                 y = y.float()
                 if y.dim() == 1:
@@ -461,7 +475,15 @@ class MLPDiffusion(nn.Module):
                     if y.size(1) < self.d_y_cond:
                         pad = y.new_zeros(y.size(0), self.d_y_cond - y.size(1))
                         y = torch.cat([y, pad], dim=1)
+<<<<<<< HEAD
             emb += F.silu(self.label_emb(y))
+=======
+                if hasattr(self, 'cond_embs'):
+                    for i, emb_fn in enumerate(self.cond_embs):
+                        emb += F.silu(emb_fn(y[:, i:i + 1]))
+                else:
+                    emb += F.silu(self.label_emb(y))
+>>>>>>> ba8f84d (condition dimension updates)
         x = self.proj(x) + emb
         return self.mlp(x)
 
